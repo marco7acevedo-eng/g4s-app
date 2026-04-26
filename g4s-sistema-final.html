@@ -553,7 +553,7 @@ async function extractDocContent(file,b64){
   }
   if(isPdf||isImg) content.push({type:'text',text:`Analiza este documento y extrae información clave de seguridad física: amenazas, incidentes, vulnerabilidades, estadísticas delincuenciales, recomendaciones. Resume en máximo 300 palabras.`});
   const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json','x-api-key':cfg().apiKey||'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content}]})
   });
   const d=await res.json();
@@ -671,8 +671,65 @@ function sRevision(){
   <div class="ai-box">
     <h3>🤖 Generar Diagnóstico Completo FO-PI-09</h3>
     <p>Se generarán <b style="color:var(--tx)">todas las secciones</b> de la plantilla oficial: contexto, estructura física, seguridad electrónica, antecedentes, criterios de impacto y probabilidad, matrices de análisis por área, matriz de riesgos y plan de seguimiento.</p>
-    <button class="btn btn-red btn-full" id="btn-gen" onclick="generate()">🚀 Generar Diagnóstico con IA</button>
+    <button class="btn btn-red btn-full" id="btn-gen" onclick="generate()">🚀 Generar con IA (requiere API Key)</button>
+  </div>
+  <div style="background:rgba(0,196,122,.05);border:1px solid rgba(0,196,122,.2);border-radius:var(--r);padding:20px;margin-top:14px">
+    <h3 style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--grn);margin-bottom:6px">📋 Generar con Claude.ai — Sin costo adicional</h3>
+    <p style="font-size:12px;color:var(--sub);margin-bottom:14px;line-height:1.7">Copia los datos del formulario, pegalo en <b style="color:var(--tx)">claude.ai</b> y pide que genere el diagnostico FO-PI-09. Luego pega el JSON aqui para generar el Word y subirlo a Drive.</p>
+    <button class="btn btn-grn btn-full" onclick="copyForClaude()" style="margin-bottom:12px">📋 Paso 1 — Copiar datos del formulario</button>
+    <div style="background:rgba(255,255,255,.03);border:1px solid var(--bdr);border-radius:var(--rs);padding:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--grn);margin-bottom:8px">Paso 2 — Pega el JSON generado por Claude:</div>
+      <textarea id="result-input" rows="5" placeholder="Pega aqui el JSON que genero Claude..." style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:var(--rs);padding:9px;color:var(--tx);font-size:11px;font-family:var(--fm);resize:vertical;outline:none"></textarea>
+      <button class="btn btn-grn" style="margin-top:8px;width:100%;justify-content:center" onclick="loadFromClaude()">✅ Paso 3 — Cargar y generar Word + Drive</button>
+    </div>
   </div>`;
+}
+
+// COPY FOR CLAUDE & LOAD FROM CLAUDE
+function copyForClaude(){
+  const kbCtx = ddb().map(d=>`[${d.category}] ${d.name}: ${(d.content||d.summary||'').slice(0,300)}`).join('\n');
+  const histCtx = buildHistCtx();
+  const text = `Eres un experto en seguridad fisica de G4S Secure Solutions Colombia S.A.
+Genera el DIAGNOSTICO DE SEGURIDAD FISICA FO-PI-09 COMPLETO basado en estos datos.
+
+DATOS DEL CLIENTE:
+${JSON.stringify(FORM, null, 2)}
+
+${histCtx ? 'HISTORIAL:\n'+histCtx : ''}
+${kbCtx ? 'BASE DE CONOCIMIENTO:\n'+kbCtx : ''}
+
+Responde UNICAMENTE con JSON valido sin backticks con esta estructura exacta:
+{"contexto_geografico":"...","entorno_norte":"...","entorno_sur":"...","entorno_oriente":"...","entorno_occidente":"...","entidades_publicas":"...","contexto_politico":"...","contexto_economico":"...","contexto_social":"...","bosquejo_desc":"...","barreras_desc":"...","accesos_desc":"...","iluminacion_desc":"...","cctv_desc":"...","alarma_intrusion_desc":"...","alarma_incendio_desc":"...","ctrl_acceso_desc":"...","estadisticas_sector":"...","incidentes_instalaciones":"...","hallazgos_imagenes":"...","areas_criticas":[{"nombre":"...","descripcion":"..."},{"nombre":"...","descripcion":"..."},{"nombre":"...","descripcion":"..."}],"amenazas":[{"codigo":"A1","amenaza":"...","agente":"...","capacidad":"Alta","intencion":"Alta","controles":"..."},{"codigo":"A2","amenaza":"...","agente":"...","capacidad":"Media","intencion":"Alta","controles":"..."},{"codigo":"A3","amenaza":"...","agente":"...","capacidad":"Alta","intencion":"Media","controles":"..."},{"codigo":"A4","amenaza":"...","agente":"...","capacidad":"Baja","intencion":"Media","controles":"..."},{"codigo":"A5","amenaza":"...","agente":"...","capacidad":"Media","intencion":"Baja","controles":"..."}],"analisis_areas":[{"area":"Área 1","probabilidad":{"FUENTE":{"A1":"Alto","A2":"Medio","A3":"Bajo","A4":"Bajo","A5":"Medio"},"DEFINICION_CONTROLES":{"A1":"Medio","A2":"Bajo","A3":"Medio","A4":"Alto","A5":"Bajo"},"PRUEBAS_VULNERABILIDAD":{"A1":"Alto","A2":"Bajo","A3":"Bajo","A4":"Bajo","A5":"Bajo"},"RESPUESTA_RECUPERACION":{"A1":"Medio","A2":"Medio","A3":"Alto","A4":"Medio","A5":"Medio"},"HUMANO":{"A1":"Alto","A2":"Medio","A3":"Bajo","A4":"Bajo","A5":"Medio"},"CALIFICACION":{"A1":"5 - FRECUENTE","A2":"3 - OCASIONAL","A3":"2 - POSIBLE","A4":"2 - POSIBLE","A5":"4 - PROBABLE"}},"impacto":{"ECONOMICO":{"A1":"8","A2":"4","A3":"2","A4":"1","A5":"4"},"INFORMACION":{"A1":"4","A2":"2","A3":"1","A4":"1","A5":"2"},"IMAGEN":{"A1":"8","A2":"4","A3":"2","A4":"1","A5":"4"},"OPERACION":{"A1":"8","A2":"4","A3":"2","A4":"1","A5":"2"},"PERSONAS":{"A1":"1","A2":"1","A3":"1","A4":"1","A5":"1"},"LEGAL":{"A1":"2","A2":"1","A3":"1","A4":"1","A5":"1"},"CALIFICACION":{"A1":"31","A2":"16","A3":"9","A4":"5","A5":"14"}}},{"area":"Área 2","probabilidad":{"FUENTE":{"A1":"Alto","A2":"Alto","A3":"Alto","A4":"Bajo","A5":"Medio"},"DEFINICION_CONTROLES":{"A1":"Bajo","A2":"Medio","A3":"Bajo","A4":"Alto","A5":"Bajo"},"PRUEBAS_VULNERABILIDAD":{"A1":"Medio","A2":"Alto","A3":"Medio","A4":"Bajo","A5":"Bajo"},"RESPUESTA_RECUPERACION":{"A1":"Alto","A2":"Medio","A3":"Alto","A4":"Medio","A5":"Medio"},"HUMANO":{"A1":"Medio","A2":"Alto","A3":"Medio","A4":"Bajo","A5":"Medio"},"CALIFICACION":{"A1":"5 - FRECUENTE","A2":"6 - CONSTANTE","A3":"5 - FRECUENTE","A4":"2 - POSIBLE","A5":"3 - OCASIONAL"}},"impacto":{"ECONOMICO":{"A1":"8","A2":"8","A3":"8","A4":"2","A5":"4"},"INFORMACION":{"A1":"4","A2":"4","A3":"4","A4":"1","A5":"2"},"IMAGEN":{"A1":"8","A2":"4","A3":"4","A4":"1","A5":"4"},"OPERACION":{"A1":"4","A2":"4","A3":"4","A4":"1","A5":"2"},"PERSONAS":{"A1":"1","A2":"1","A3":"1","A4":"1","A5":"1"},"LEGAL":{"A1":"2","A2":"2","A3":"2","A4":"1","A5":"1"},"CALIFICACION":{"A1":"27","A2":"23","A3":"23","A4":"7","A5":"14"}}},{"area":"Área 3","probabilidad":{"FUENTE":{"A1":"Medio","A2":"Alto","A3":"Bajo","A4":"Alto","A5":"Bajo"},"DEFINICION_CONTROLES":{"A1":"Alto","A2":"Bajo","A3":"Bajo","A4":"Bajo","A5":"Alto"},"PRUEBAS_VULNERABILIDAD":{"A1":"Bajo","A2":"Medio","A3":"Bajo","A4":"Bajo","A5":"Bajo"},"RESPUESTA_RECUPERACION":{"A1":"Medio","A2":"Medio","A3":"Medio","A4":"Medio","A5":"Medio"},"HUMANO":{"A1":"Alto","A2":"Bajo","A3":"Bajo","A4":"Medio","A5":"Bajo"},"CALIFICACION":{"A1":"4 - PROBABLE","A2":"3 - OCASIONAL","A3":"1 - IMPROBABLE","A4":"3 - OCASIONAL","A5":"2 - POSIBLE"}},"impacto":{"ECONOMICO":{"A1":"4","A2":"4","A3":"1","A4":"4","A5":"1"},"INFORMACION":{"A1":"2","A2":"2","A3":"1","A4":"2","A5":"1"},"IMAGEN":{"A1":"4","A2":"4","A3":"1","A4":"4","A5":"1"},"OPERACION":{"A1":"4","A2":"4","A3":"1","A4":"4","A5":"1"},"PERSONAS":{"A1":"1","A2":"1","A3":"1","A4":"1","A5":"1"},"LEGAL":{"A1":"1","A2":"1","A3":"1","A4":"1","A5":"1"},"CALIFICACION":{"A1":"16","A2":"16","A3":"6","A4":"16","A5":"5"}}}],"riesgos":[{"area":"...","amenaza":"A1","calificacion":32,"nivel":"ALTO","tipo_control":"Preventivo","descripcion_control":"...","responsable":"G4S"},{"area":"...","amenaza":"A2","calificacion":16,"nivel":"MEDIO","tipo_control":"Detectivo","descripcion_control":"...","responsable":"Cliente"},{"area":"...","amenaza":"A3","calificacion":24,"nivel":"ALTO","tipo_control":"Preventivo","descripcion_control":"...","responsable":"Compartido"},{"area":"...","amenaza":"A4","calificacion":8,"nivel":"BAJO","tipo_control":"Correctivo","descripcion_control":"...","responsable":"Cliente"},{"area":"...","amenaza":"A5","calificacion":12,"nivel":"MEDIO","tipo_control":"Detectivo","descripcion_control":"...","responsable":"G4S"},{"area":"...","amenaza":"A1","calificacion":6,"nivel":"BAJO","tipo_control":"Correctivo","descripcion_control":"...","responsable":"Compartido"}],"seguimiento":[{"control":"...","seguimiento":"...","periodicidad":"mensual"},{"control":"...","seguimiento":"...","periodicidad":"trimestral"},{"control":"...","seguimiento":"...","periodicidad":"semestral"}],"lecciones":"...","conclusiones":"conclusiones detalladas y recomendaciones prioritarias"}`;
+  navigator.clipboard.writeText(text).then(()=>{
+    toast('✅ Datos copiados — Pegalos en claude.ai');
+  }).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('✅ Datos copiados — Pegalos en claude.ai');
+  });
+}
+
+async function loadFromClaude(){
+  const inp = document.getElementById('result-input');
+  if(!inp || !inp.value.trim()){toast('Pega el JSON de Claude primero','er');return}
+  try{
+    const text = inp.value.trim().replace(/```json|```/g,'').trim();
+    DIAG = JSON.parse(text);
+    DIAG._imgs = IMGS.map(i=>({name:i.name,b64:i.b64,note:i.note}));
+    CUR_ID = CUR_ID||('d_'+Date.now());
+    const entry={id:CUR_ID,fecha:new Date().toLocaleDateString('es-CO'),fechaISO:new Date().toISOString(),form:{...FORM},diag:DIAG};
+    upsert(entry);
+    await driveUpload(entry);
+    toast('Diagnostico cargado y guardado en Drive');
+    go('result');
+  }catch(e){
+    toast('Error al leer el JSON: '+e.message+'. Verifica que hayas copiado todo el JSON correctamente.','er');
+  }
 }
 
 // helpers
@@ -716,7 +773,7 @@ async function generate(){
     const kbCtx=buildKBCtx();
     const prompt=buildPrompt(hist,imgAnalysis,kbCtx);
     const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json','x-api-key':cfg().apiKey||'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:6000,messages:[{role:'user',content:prompt}]})
     });
     const data=await res.json();
@@ -741,7 +798,7 @@ async function analyzeImages(){
   const content=IMGS.slice(0,5).map(img=>({type:'image',source:{type:'base64',media_type:img.type||'image/jpeg',data:img.b64.split(',')[1]}}));
   content.push({type:'text',text:`Analiza estas imágenes de un recorrido de diagnóstico de seguridad física. Identifica: vulnerabilidades visibles, estado de infraestructura, riesgos evidentes y recomendaciones específicas. Responde en español en un párrafo conciso.`});
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':cfg().apiKey||'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content}]})});
     const d=await res.json();
     return d.content?.map(i=>i.text||'').join('')||'';
   }catch(e){return''}
@@ -972,6 +1029,7 @@ function renderSet(){
     <p style="color:var(--sub);font-size:12px;margin-bottom:14px;line-height:1.7">Cada diagnóstico generado se subirá automáticamente a la carpeta <b style="color:var(--tx)">G4S Diagnósticos/</b> de tu Drive como .doc y .json.</p>
     <div class="fld"><label>Google OAuth Client ID</label><input id="drv-cid" type="text" value="${c.driveClientId||''}" placeholder="1234567890-xxxx.apps.googleusercontent.com"></div>
     <div class="fld"><label>Nombre de carpeta en Drive</label><input id="drv-folder" type="text" value="${c.driveFolderName||'G4S Diagnósticos'}" placeholder="G4S Diagnósticos"></div>
+    <div class="fld"><label>Anthropic API Key</label><input id="api-key" type="password" value="${c.apiKey||''}" placeholder="sk-ant-api03-..."></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <button class="btn btn-pur" onclick="saveDriveCfg()">💾 Guardar</button>
       ${c.driveClientId?`<button class="btn btn-ghost" onclick="testDrive()">🔗 Probar</button><button class="btn btn-ghost" style="color:var(--red)" onclick="clearDrive()">✕ Desconectar</button>`:''}
@@ -1016,7 +1074,7 @@ function renderSet(){
     </div>
   </div>`;
 }
-function saveDriveCfg(){const cid=document.getElementById('drv-cid').value.trim();const folder=document.getElementById('drv-folder').value.trim()||'G4S Diagnósticos';cfgS({...cfg(),driveClientId:cid,driveFolderName:folder});sbRefresh();toast('Configuración guardada');renderSet()}
+function saveDriveCfg(){const cid=document.getElementById('drv-cid').value.trim();const folder=document.getElementById('drv-folder').value.trim()||'G4S Diagnósticos';const apikey=document.getElementById('api-key')?.value.trim()||'';cfgS({...cfg(),driveClientId:cid,driveFolderName:folder,apiKey:apikey});sbRefresh();toast('Configuración guardada');renderSet()}
 function clearDrive(){if(!confirm('¿Desconectar Drive?'))return;const c=cfg();delete c.driveClientId;delete c.driveFolderName;cfgS(c);sbRefresh();toast('Desconectado','er');renderSet()}
 function togCfg(k,btn){btn.classList.toggle('on');cfgS({...cfg(),[k]:btn.classList.contains('on')})}
 function exportAll(){const blob=new Blob([JSON.stringify({diagnosticos:db(),documentos:ddb()},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='g4s_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);toast('Exportado')}
