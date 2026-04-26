@@ -1299,10 +1299,38 @@ ${(d.seguimiento||[]).map(s=>`<tr><td>${s.control}</td><td>${s.seguimiento}</td>
 }
 
 // ══════════════════════════════════════════════════════
+// AUTO-RECONNECT DRIVE ON STARTUP
+async function autoReconnectDrive(){
+  const c=cfg();
+  if(!c.driveClientId) return;
+  try{
+    await loadGis(); await loadGapi();
+    await window.gapi.client.init({discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']});
+    const tc=window.google.accounts.oauth2.initTokenClient({
+      client_id:c.driveClientId,
+      scope:'https://www.googleapis.com/auth/drive.file',
+      callback:res=>{
+        if(res.access_token){
+          driveToken=res.access_token;
+          document.getElementById('drv-badge').className='dp-status on';
+          document.getElementById('drv-badge').textContent='Conectado';
+          document.getElementById('drv-sub').textContent='Sync automático activo';
+          document.getElementById('drv-chip').style.display='';
+          sbRefresh();
+        }
+      }
+    });
+    // Silent reconnect - no prompt
+    tc.requestAccessToken({prompt:''});
+  }catch(e){ console.log('Drive auto-reconnect silent fail:', e); }
+}
+
 // INIT
 // ══════════════════════════════════════════════════════
 sbRefresh();
 go('dash');
+// Auto-reconnect Drive silently after 2 seconds
+setTimeout(autoReconnectDrive, 2000);
 </script>
 </body>
 </html>
